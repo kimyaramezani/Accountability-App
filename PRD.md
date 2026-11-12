@@ -78,12 +78,38 @@ Every goal is a rule the app can score once a week: a metric, a target, and how 
 
 | Goal type | Example goals | Verified by | How it works | Watch-outs |
 | --- | --- | --- | --- | --- |
-| Workouts and activity | 4 workouts of 30+ min a week; 8,000 steps on 5 of 7 days; 150 exercise minutes a week | Apple Health (HealthKit) | Reads workouts, steps and exercise minutes. Covers Apple Watch plus any app that writes to Health (Strava, Peloton, Garmin, Whoop and others). Background updates keep progress current. | Some apps don't sync to Health, or sync late. Health data can't be read while the phone is locked, so updates may lag until the phone is opened. |
-| Sleep | 7+ hours on 5 of 7 nights; in bed by 11:30 pm on weeknights | Apple Health (sleep analysis) | Reads sleep sessions from Apple Watch, Oura, Eight Sleep and other apps that write to Health. | Needs a sleep tracker. Without one, sleep falls back to manual. Naps and split nights need a clear rule. |
+| Workouts and activity | 4 workouts of 30+ min a week; 8,000 steps on 5 of 7 days; 150 exercise minutes a week | Apple Health (HealthKit), or a direct app connection | Reads workouts, steps and exercise minutes. Covers Apple Watch plus any app that writes to Health (Strava, Peloton, Garmin, Whoop and others). Background updates keep progress current. | Some apps don't sync to Health, or sync late. Health data can't be read while the phone is locked, so updates may lag until the phone is opened. |
+| Sleep | 7+ hours on 5 of 7 nights; in bed by 11:30 pm on weeknights | Apple Health (sleep analysis), or a direct app connection | Reads sleep sessions from Apple Watch, Oura, Eight Sleep and other apps that write to Health. | Needs a sleep tracker. Without one, sleep falls back to manual. Naps and split nights need a clear rule. |
 | Screen time | Under 1 hr of social media on 5 of 7 days; under 3 hrs total daily | Apple Screen Time API (FamilyControls + DeviceActivity) | The user picks apps or categories once. The app sets a daily limit; iOS alerts the app's extension if the limit is crossed, which marks that day as missed. No alert by midnight means the day passed. | Pass/fail only: outside the EU, iOS does not let third-party apps read actual minutes used, so the app can't say "you used 1 hr 42 min." Tracks iPhone use only. Requires Apple's Family Controls distribution entitlement. |
 | Custom (manual) | Read 20 min 5x a week; no alcohol on weeknights; meditate daily | Self check-in, optional photo | One-tap check-in per day or session, with an optional photo shown in the group feed. Friends can challenge a check-in. | Honor system. Keep challenges playful, not a trial. |
 
 **Unverifiable data.** If a data source is disconnected or permission is revoked mid-week, the goal shows as "unverified" rather than missed, and the member can switch it to manual check-in for that week. The group sees the label, which is its own gentle accountability.
+
+### Connecting any health or fitness app
+
+Members should be able to use whatever app or device they already track with. Apple Health is the hub for v1 because most popular apps already send their data to it and reading it is free; direct connections to individual apps fill the gaps.
+
+Apple Health captures what goals need (workouts, steps, exercise minutes, sleep) from almost every major app. What it misses is each brand's own scores, like WHOOP Recovery or Garmin Body Battery.
+
+| App or device | How the data gets in | What Apple Health doesn't carry |
+| --- | --- | --- |
+| Apple Watch, iPhone | Apple Health | Nothing |
+| Strava, Peloton, Nike Run Club and most gym apps | Apple Health, once the member turns on Health sync in that app | App-only stats (kudos, Peloton output) |
+| Garmin | Apple Health; the Garmin Connect app must be opened for data to sync | Body Battery, Training Readiness, HRV Status; workouts arrive without GPS routes |
+| Oura | Apple Health | Readiness, Sleep Score, Activity Score, HRV |
+| WHOOP | Apple Health | Recovery, Strain, Sleep Performance, HRV |
+| Fitbit / Google Health | Apple Health, via the Google Health app (added Aug 2026) | Some data, such as HRV |
+| Any app that doesn't write to Apple Health | Direct connection (below), or manual check-in | Everything, until connected |
+
+**Direct connections (v1.1).** For an app that doesn't sync to Apple Health, or a goal built on a brand score ("WHOOP Recovery in the green 4 days a week"), the app connects straight to that service. The member signs in to the service once, and the backend receives new data automatically. Build only the ones the group actually uses. Strava, Oura, WHOOP and Fitbit offer public developer APIs; Garmin requires applying to its developer program.
+
+**Aggregator option.** Services like Terra connect hundreds of apps through one integration, but plans start at $399 a month, too much for one friend group. Revisit if the app opens to the public.
+
+**Rules**
+
+- Each goal uses one data source, chosen at setup, so the same workout is never counted twice (e.g. a Peloton ride logged by both Peloton and Apple Watch).
+- Goal setup lists the member's available sources and shows a "last synced" time on each goal.
+- If a member's app isn't supported yet, the goal falls back to manual check-in until it is.
 
 ## Weekly cycle, roasts and celebrations
 
@@ -174,7 +200,7 @@ The phone does the verifying and the server only sees scores: each iPhone reads 
 | Sign-in | Sign in with Apple | One-tap accounts, no passwords |
 | Distribution | TestFlight | Install for the friend group without an App Store launch |
 
-**What leaves the phone.** Only derived results: e.g. "3 of 4 workouts, Tue/Thu/Sat", "sleep goal met 5 of 7 nights", "screen-time limit crossed on Wednesday". Raw health records, heart rate, sleep stages and app usage details never leave the device. Workout type and duration can be shared if the member opts in (it makes the roasts better).
+**What leaves the phone.** Only derived results: e.g. "3 of 4 workouts, Tue/Thu/Sat", "sleep goal met 5 of 7 nights", "screen-time limit crossed on Wednesday". Raw health records, heart rate, sleep stages and app usage details never leave the device. Direct app connections are the exception: that data goes from the service to the backend, so the backend keeps only the fields a goal needs and deletes the rest. Workout type and duration can be shared if the member opts in (it makes the roasts better).
 
 **Data model (core objects).** User, Group, Membership (with roast intensity, excused weeks left), Goal (type, metric, target, frequency, source, effective-from week), WeeklyProgress (goal, week, daily values, status), Check-in (with optional photo), FeedPost (weekly results, lines per member), Reaction / Comment, Challenge.
 
@@ -215,9 +241,12 @@ The biggest risk is Screen Time: it's pass/fail only and gated by an Apple entit
 2. **Auto-verification:** HealthKit workouts, activity and sleep with background updates. Apply for the Family Controls entitlement in parallel.
 3. **The fun part:** Weekly Reckoning post, roasts and celebrations, reactions, streaks, nudges and push notifications.
 4. **Screen time:** DeviceActivity-based screen-time goals once the entitlement is approved.
-5. **Polish:** widget, badges, challenges on check-ins, excused weeks, roast reporting.
+5. **Polish:** widget, badges, challenges on check-ins, excused weeks, roast reporting, and direct connections to any app a friend uses that doesn't sync to Apple Health.
 
 ## Sources
 
 - [Apple Developer Forums: Screen Time usage data access outside the EU](https://developer.apple.com/forums/thread/849296)
 - [Apple Developer Forums: Screen Time data stays on device (Apple reply)](https://developer.apple.com/forums/thread/834794)
+- [MacRumors: Fitbit data can finally sync to Apple Health](https://www.macrumors.com/2026/08/03/fitbit-apple-health-syncing/)
+- [Sensai: What Oura, WHOOP and Garmin sync to Apple Health](https://www.sensai.fit/blog/wearable-apple-health-integration-what-syncs-oura-whoop-garmin)
+- [Terra: unified health data API](https://www.tryterra.co/)
